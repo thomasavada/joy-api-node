@@ -1,0 +1,68 @@
+{
+  "name": "joy-api-node",
+  "version": "1.0.0",
+  "description": "Node.js client for Joy Loyalty Program REST API v2",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "yarn tsc",
+    "dev": "yarn tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:customers": "jest tests/customers.test.js",
+    "test:programs": "jest tests/programs.test.js",
+    "test:transactions": "jest tests/transactions.test.js",
+    "test:rewards": "jest tests/rewards.test.js",
+    "test:tiers": "jest tests/tiers.test.js",
+    "test:shop": "jest tests/shop.test.js",
+    "test:referrals": "jest tests/referrals.test.js",
+    "test:redemption": "jest tests/redemption.test.js",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "joy",
+    "loyalty",
+    "rewards",
+    "api",
+    "client",
+    "typescript",
+    "node"
+  ],
+  "author": "Thomas",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.11.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "chalk": "^5.3.0",
+    "commander": "^11.0.0",
+    "dotenv": "^17.2.1",
+    "eslint": "^8.50.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.1.1",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.9.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/joy-api-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/joy-api-node/issues"
+  },
+  "homepage": "https://github.com/yourusername/joy-api-node#readme",
+  "files": [
+    "dist/**/*"
+  ],
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
