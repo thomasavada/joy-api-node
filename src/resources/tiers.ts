@@ -13,6 +13,6 @@ export class Tiers {
   }
 
   async getRewardsByType(benefitType: string): Promise<SuccessResponse<Program[]>> {
-    return this.client.get(`/rest_api/v2/tiers/rewards/${benefitType}`);
+    return this.client.get(`/rest_api/v2/tiers/benefits/${benefitType}`);
   }
 }

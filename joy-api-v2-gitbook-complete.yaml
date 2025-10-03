@@ -2004,12 +2004,18 @@ paths:
           in: query
           schema:
             type: string
-          description: Filter by Shopify customer ID
+          description: >
+            Filter by Shopify customer ID.
+            
+            **Note:** At least one of `shopifyCustomerId` or `customerId` is required.
         - name: customerId
           in: query
           schema:
             type: string
-          description: Filter by internal customer ID
+          description: >
+            Filter by internal customer ID.
+            
+            **Note:** At least one of `shopifyCustomerId` or `customerId` is required.
         - name: before
           in: query
           schema:
@@ -2817,7 +2823,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /rest_api/v2/tiers/rewards/{benefitType}:
+  /rest_api/v2/tiers/benefits/{benefitType}:
     get:
       tags:
         - Tiers
@@ -2993,12 +2999,8 @@ paths:
                       data:
                         type: object
                         properties:
-                          totalClicks:
-                            type: integer
                           totalConversions:
                             type: integer
-                          conversionRate:
-                            type: number
 
   # =============== SHOP INFORMATION ===============
   /rest_api/v2/whoami:
