@@ -33,7 +33,7 @@ export class Referrals {
   }
 
   async getAnalytics(params?: ReferralAnalyticsParams): Promise<SuccessResponse<{
-    totalConversions: number;
+    countCouponCodeUsage: number;
   }>> {
     return this.client.get('/rest_api/v2/referrals/analytics', params);
   }
