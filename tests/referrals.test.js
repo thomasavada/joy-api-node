@@ -86,14 +86,10 @@ describe('Referrals API', () => {
 
       expect(response.success).toBe(true);
       expect(response.data).toBeDefined();
-      expect(typeof response.data.totalClicks).toBe('number');
-      expect(typeof response.data.totalConversions).toBe('number');
-      expect(typeof response.data.conversionRate).toBe('number');
-      
+      expect(typeof response.data.countCouponCodeUsage).toBe('number');
+
       // All values should be non-negative
-      expect(response.data.totalClicks).toBeGreaterThanOrEqual(0);
-      expect(response.data.totalConversions).toBeGreaterThanOrEqual(0);
-      expect(response.data.conversionRate).toBeGreaterThanOrEqual(0);
+      expect(response.data.countCouponCodeUsage).toBeGreaterThanOrEqual(0);
     });
 
     test('should get referral analytics with date range', async () => {
@@ -104,9 +100,7 @@ describe('Referrals API', () => {
 
       expect(response.success).toBe(true);
       expect(response.data).toBeDefined();
-      expect(typeof response.data.totalClicks).toBe('number');
-      expect(typeof response.data.totalConversions).toBe('number');
-      expect(typeof response.data.conversionRate).toBe('number');
+      expect(typeof response.data.countCouponCodeUsage).toBe('number');
     });
 
     test('should validate date format', async () => {
