@@ -25,9 +25,8 @@ export class Referrals {
   }
 
   async getSummary(customerId: string): Promise<SuccessResponse<{
-    totalReferrals: number;
-    totalPointsEarned: number;
-    totalVouchersEarned: number;
+    totalRedeemCoupon: number;
+    totalPointEarnRefer: number;
   }>> {
     return this.client.get(`/rest_api/v2/referrals/customers/${customerId}/summary`);
   }

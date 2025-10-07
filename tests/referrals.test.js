@@ -60,14 +60,12 @@ describe('Referrals API', () => {
 
       expect(response.success).toBe(true);
       expect(response.data).toBeDefined();
-      expect(typeof response.data.totalReferrals).toBe('number');
-      expect(typeof response.data.totalPointsEarned).toBe('number');
-      expect(typeof response.data.totalVouchersEarned).toBe('number');
-      
+      expect(typeof response.data.totalRedeemCoupon).toBe('number');
+      expect(typeof response.data.totalRedeemCoupon).toBe('number');
+
       // All values should be non-negative
-      expect(response.data.totalReferrals).toBeGreaterThanOrEqual(0);
-      expect(response.data.totalPointsEarned).toBeGreaterThanOrEqual(0);
-      expect(response.data.totalVouchersEarned).toBeGreaterThanOrEqual(0);
+      expect(response.data.totalRedeemCoupon).toBeGreaterThanOrEqual(0);
+      expect(response.data.totalPointEarnRefer).toBeGreaterThanOrEqual(0);
     });
 
     test('should handle non-existent customer', async () => {

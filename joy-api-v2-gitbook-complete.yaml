@@ -2962,11 +2962,9 @@ paths:
                       data:
                         type: object
                         properties:
-                          totalReferrals:
+                          totalRedeemCoupon:
                             type: integer
-                          totalPointsEarned:
-                            type: integer
-                          totalVouchersEarned:
+                          totalPointEarnRefer:
                             type: integer
 
   /rest_api/v2/referrals/analytics:
