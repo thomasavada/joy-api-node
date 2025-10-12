@@ -1,0 +1,3009 @@
+openapi: 3.0.0
+info:
+  title: Joy Loyalty Program - REST API v2
+  version: 2.0.0
+  description: |
+    REST API v2 for Joy Loyalty Program with improved consistency, plan restrictions, and grouped endpoints.
+
+    **Plan Requirements**: All endpoints require Advanced or Enterprise plans.
+
+    **Response Format**: All responses follow a consistent envelope:
+    - Success: `{ success: true, data, meta, timestamp, message? }`
+    - Error: `{ success: false, error: { message, code, statusCode, details? }, timestamp }`
+
+    - `meta.count` is used for non-paginated list counts
+    - `meta.pagination` is used for paginated responses and may include: `hasNext`, `hasPre`, and optionally `total`, `totalPage`
+
+    **Data Filtering**: API responses only include fields with actual data. Fields with null or undefined values are automatically filtered out to provide cleaner responses for customer-facing applications.
+
+    **Pagination**: 
+    - **Cursor-based pagination**: Uses `before` and `after` parameters accepting Firestore document IDs for navigation
+    - **Page size control**: The `limit` parameter controls page size with endpoint-specific defaults (customers: 20, activities: 10, rewards: 10, max: 1000)
+    - **Count optimization**: Use `hasCount=true` to include totals where supported. This may increase response time due to additional database queries
+    - **Response structure**: Pagination metadata is returned under `meta.pagination` and includes `hasNext` and `hasPre`. When available, also includes `total` and `totalPage`.
+    - **Navigation**: Use the document ID from the first item with `before` parameter to get previous page, or last item's ID with `after` parameter for next page
+
+    **Query Parameters**: Most list endpoints support filtering by date ranges (`created_at_min`, `created_at_max`, `updated_at_min`, `updated_at_max`), sorting (`order` parameter), and entity-specific filters.
+servers:
+  - url: https://dev-api.joy.so
+  - url: https://api.joy.so
+tags:
+  - name: Programs
+    description: Earning and spending programs management
+  - name: Customers
+    description: Customer data and management
+  - name: Activities
+    description: Point activities and transactions
+  - name: Rewards
+    description: Customer rewards and redemptions
+  - name: Tiers
+    description: Tier management
+  - name: Referrals
+    description: Referral system management
+  - name: Shop
+    description: Shop information and authentication
+
+components:
+  securitySchemes:
+    JoyAuth:
+      type: apiKey
+      in: header
+      name: X-Joy-Loyalty-App-Key
+    JoySecretAuth:
+      type: apiKey
+      in: header
+      name: X-Joy-Loyalty-Secret-Key
+
+  parameters:
+    AppKeyHeader:
+      name: X-Joy-Loyalty-App-Key
+      in: header
+      required: true
+      schema:
+        type: string
+      description: App ID of your shop which retrieved from the Settings page
+      example: '{{appKey}}'
+    
+    SecretKeyHeader:
+      name: X-Joy-Loyalty-Secret-Key
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Secret Key of your shop which retrieved from the Settings page
+      example: '{{secretKey}}'
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        meta:
+          type: object
+          description: Additional metadata such as counts and pagination
+        message:
+          type: string
+          example: 'Operation completed successfully'
+        timestamp:
+          type: string
+          format: date-time
+          example: '2023-07-28T07:27:54.123Z'
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: 'Resource not found'
+            code:
+              type: string
+              example: 'NOT_FOUND'
+            statusCode:
+              type: integer
+              example: 404
+            details:
+              type: object
+        timestamp:
+          type: string
+          format: date-time
+          example: '2023-07-28T07:27:54.123Z'
+
+    PaginatedResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+              description: Array of items for current page
+            meta:
+              type: object
+              properties:
+                pagination:
+                  type: object
+                  required:
+                    - hasNext
+                    - hasPre
+                  properties:
+                    hasNext:
+                      type: boolean
+                      description: True if more results exist after current page
+                    hasPre:
+                      type: boolean
+                      description: True if results exist before current page
+                    total:
+                      type: integer
+                      description: Total count of all matching results (when available)
+                    totalPage:
+                      type: integer
+                      description: Total number of pages calculated as ceil(total/limit) (when available)
+              description: Pagination metadata container
+
+    ListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+            meta:
+              type: object
+              properties:
+                count:
+                  type: integer
+                  description: Number of items returned
+
+    Program:
+      type: object
+      description: "Loyalty program (earning or spending) with all fields that may be returned by the API. Note: Actual responses may only include non-null fields due to automatic filtering."
+      properties:
+        id:
+          type: string
+          example: 'prog_abc123'
+        title:
+          type: string
+          example: 'Sign Up Bonus'
+        type:
+          type: string
+          enum: [earning, spending, tier_spending, tier]
+          example: 'earning'
+        event:
+          type: string
+          example: 'sign_up'
+        status:
+          type: boolean
+          example: true
+        priority:
+          type: integer
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2024-01-20T14:45:30.000Z'
+        expired:
+          type: boolean
+          example: false
+        isDraft:
+          type: boolean
+          example: false
+        earnBy:
+          type: string
+          enum: [price, order]
+          example: 'price'
+        rateMoney:
+          type: number
+          example: 1.0
+        earnPoint:
+          type: integer
+          example: 100
+        startDate:
+          type: string
+          format: date-time
+          example: '2024-01-01T00:00:00.000Z'
+        endDate:
+          type: string
+          format: date-time
+          example: '2024-12-31T23:59:59.000Z'
+        autoRemovePoints:
+          type: boolean
+          example: false
+        appliedPlaceOrderTo:
+          type: string
+          enum: [all, vip-tier]
+          example: 'all'
+        appliedSource:
+          type: array
+          items:
+            type: string
+          example: ['web', 'pos']
+        translateTitle:
+          type: object
+          example: {}
+        typeMilestone:
+          type: string
+          example: null
+        milestones:
+          type: array
+          items:
+            type: object
+          example: []
+        spendPoint:
+          type: integer
+          example: 500
+        earnAmount:
+          type: number
+          example: 10.0
+        redeemType:
+          type: string
+          example: 'amount_discount'
+        appliedTo:
+          type: string
+          example: 'all'
+        appliedCollectionIds:
+          type: array
+          items:
+            type: string
+          example: []
+        redeemIn:
+          type: string
+          enum: [available_in_pos, available_in_online_store]
+          example: 'available_in_online_store'
+        orderReq:
+          type: string
+          enum: [none, min_amount]
+          example: 'none'
+        orderReqAmount:
+          type: number
+          example: 0
+        minSpendPoint:
+          type: string
+          example: ''
+        maxSpendPoint:
+          type: string
+          example: ''
+        expiredTime:
+          type: string
+          example: ''
+        userAvailability:
+          type: string
+          enum: [allUsers, userRedeemed]
+          example: 'userRedeemed'
+        showLoyaltyPage:
+          type: boolean
+          example: true
+        limitRedeem:
+          type: string
+          enum: [redeemWithoutLimit, redeemLimit]
+          example: 'redeemWithoutLimit'
+        totalLimitationRedeem:
+          type: integer
+          example: 0
+        combinedWith:
+          type: array
+          items:
+            type: string
+          example: []
+        specificProducts:
+          type: array
+          items:
+            type: object
+          example: []
+        specificProductIds:
+          type: array
+          items:
+            type: string
+          example: []
+        specificCollections:
+          type: array
+          items:
+            type: object
+          example: []
+        variantIds:
+          type: array
+          items:
+            type: string
+          example: []
+        freeProductIds:
+          type: array
+          items:
+            type: string
+          example: []
+        giftStatus:
+          type: string
+          enum: [none, hot, expiring-soon]
+          example: 'none'
+        excludeProducts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              image:
+                type: object
+                properties:
+                  src:
+                    type: string
+        includeProducts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              image:
+                type: object
+                properties:
+                  src:
+                    type: string
+        conditions:
+          type: array
+          items:
+            type: object
+        earnPointsTiers:
+          type: array
+          items:
+            type: object
+            properties:
+              earnPoint:
+                type: integer
+              rateMoney:
+                type: number
+        roundingMethod:
+          type: string
+          enum: [round, floor, ceil]
+          example: 'round'
+        skipEarnPointGuest:
+          type: boolean
+          example: false
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Internal customer ID
+          example: 'b1wvKrxdDZ11U8tUlyyx'
+        shopifyCustomerId:
+          type: integer
+          description: Shopify customer ID
+          example: 7801029525739
+        email:
+          type: string
+          format: email
+          description: Customer email address
+          example: 'customer@example.com'
+        name:
+          type: string
+          description: Customer full name
+          example: 'John Doe'
+        firstName:
+          type: string
+          description: Customer first name
+          example: 'John'
+        lastName:
+          type: string
+          description: Customer last name
+          example: 'Doe'
+        type:
+          type: string
+          enum: [member, guest, left]
+          description: Customer type
+          example: 'member'
+        point:
+          type: integer
+          description: Current available points
+          example: 100
+        tierPoint:
+          type: integer
+          description: Points used for tier calculation
+          example: 100
+        pendingPoint:
+          type: integer
+          description: Points pending approval
+          example: 0
+        totalSpent:
+          type: number
+          description: Total amount spent
+          example: 0
+        totalEarnedPoints:
+          type: integer
+          description: Lifetime earned points
+          example: 100
+        hasPoint:
+          type: boolean
+          description: Whether customer has available points
+          example: true
+        hasJoinedProgram:
+          type: boolean
+          description: Whether customer joined loyalty program
+          example: true
+        orderCount:
+          type: integer
+          description: Number of orders placed
+          example: 0
+        state:
+          type: string
+          enum: [enabled, disabled]
+          description: Account state
+          example: 'enabled'
+        latestActivity:
+          type: string
+          format: date-time
+          description: Last activity timestamp
+          example: '2025-04-29T10:23:05.990Z'
+        notifications:
+          type: object
+          description: Customer notification preferences
+          example: {}
+        acceptsMarketing:
+          type: boolean
+          description: Marketing consent
+          example: false
+        birthday:
+          type: string
+          description: Birthday in MM/DD format
+          example: '05/15'
+        dateOfBirth:
+          type: string
+          format: date
+          description: Date of birth in YYYY-MM-DD format
+          example: '1990-05-15'
+        tierId:
+          type: string
+          description: Current tier ID
+          example: '1Fe1kqHZbE7Alx1GmFEC'
+        tierName:
+          type: string
+          description: Current tier name
+          example: 'Bronze'
+        tierUpdatedAt:
+          type: string
+          format: date-time
+          description: Last tier update timestamp
+          example: '2025-06-16T10:20:58.636Z'
+        phone:
+          type: string
+          nullable: true
+          description: Phone number
+          example: null
+        pointsRemain:
+          type: integer
+          description: Points needed for next tier
+          example: 4900
+        birthMonth:
+          type: string
+          description: Birth month in MM format
+          example: '05'
+        isCustomerB2B:
+          type: boolean
+          description: Whether customer is B2B
+          example: false
+        earnSignUp:
+          type: boolean
+          description: Whether customer earned signup points
+          example: true
+        referralCode:
+          type: string
+          description: Customer's referral code
+          example: '2kxRoqlDQMp'
+        hasTier:
+          type: boolean
+          description: Whether customer has a tier assigned
+          example: false
+        totalSpentCurrencyCode:
+          type: string
+          description: Currency code for spending
+          example: 'VND'
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: '2025-04-29T10:23:05.991Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: '2025-06-16T10:20:58.663Z'
+
+    Activity:
+      type: object
+      description: "Point transaction/activity with all fields that may be returned by the API. Note: Actual responses may only include non-null fields due to automatic filtering."
+      properties:
+        id:
+          type: string
+          description: Activity ID
+          example: 'act_abc123'
+        shopId:
+          type: string
+          description: Shop ID
+          example: 'shop_xyz789'
+        customerId:
+          type: string
+          description: Internal customer ID
+          example: 'cust_def456'
+        shopifyCustomerId:
+          type: integer
+          description: Shopify customer ID
+          example: 7801029525739
+        email:
+          type: string
+          format: email
+          description: Customer email address
+          example: 'customer@example.com'
+        content:
+          type: string
+          description: Activity description/content
+          example: 'Award points via REST API'
+        type:
+          type: string
+          description: Activity type
+          example: 'earnPoint'
+        source:
+          type: string
+          description: Source of the activity
+          example: 'rest_api'
+        event:
+          type: string
+          description: Program event that triggered this activity
+          example: 'earn_point_rest_api'
+        oldPoint:
+          type: integer
+          description: Previous point balance
+          example: 50
+        newPoint:
+          type: integer
+          description: New point balance after this activity
+          example: 150
+        programId:
+          type: string
+          nullable: true
+          description: Associated program ID
+          example: 'prog_abc123'
+        programTitle:
+          type: string
+          nullable: true
+          description: Associated program title
+          example: 'Manual Point Award'
+        priceRuleId:
+          type: string
+          nullable: true
+          description: Shopify price rule ID for discounts
+          example: null
+        discountId:
+          type: string
+          nullable: true
+          description: Shopify discount ID
+          example: null
+        couponCode:
+          type: string
+          nullable: true
+          description: Generated coupon code
+          example: null
+        orderId:
+          type: string
+          nullable: true
+          description: Associated Shopify order ID
+          example: null
+        orderName:
+          type: string
+          nullable: true
+          description: Shopify order name
+          example: null
+        orderNumber:
+          type: integer
+          nullable: true
+          description: Shopify order number
+          example: null
+        orderCurrency:
+          type: string
+          nullable: true
+          description: Order currency code
+          example: null
+        earnBy:
+          type: string
+          nullable: true
+          description: How points were earned (price/order)
+          example: null
+        rateMoney:
+          type: number
+          nullable: true
+          description: Money to points conversion rate
+          example: null
+        earnPoint:
+          type: integer
+          nullable: true
+          description: Points earned in this activity
+          example: 100
+        spendPoint:
+          type: integer
+          nullable: true
+          description: Points spent in this activity
+          example: null
+        referralCustomerEmail:
+          type: string
+          nullable: true
+          description: Email of referring customer
+          example: null
+        referredCustomerEmail:
+          type: string
+          nullable: true
+          description: Email of referred customer
+          example: null
+        milestoneOrder:
+          type: integer
+          nullable: true
+          description: Milestone order number
+          example: null
+        isPendingPointPlaceOrder:
+          type: boolean
+          nullable: true
+          description: Whether points are pending for order
+          example: null
+        refundPendingPoint:
+          type: integer
+          nullable: true
+          description: Refunded pending points
+          example: null
+        pendingPointUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: When pending points expire
+          example: null
+        adminNote:
+          type: string
+          nullable: true
+          description: Admin note for this activity
+          example: null
+        userNote:
+          type: string
+          nullable: true
+          description: User note for this activity
+          example: null
+        reason:
+          type: string
+          nullable: true
+          description: Reason for the activity
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+          description: Activity creation timestamp
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: '2024-01-15T10:30:00.000Z'
+
+    Reward:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Reward ID
+          example: 'OPfV7dXaPn1Ejbm9piPs'
+        customerId:
+          type: string
+          description: Internal customer ID
+          example: 'o9AQeUCXYDjbeFm7vAKy'
+        email:
+          type: string
+          format: email
+          description: Customer email address
+          example: 'anhth@avadagroup.com'
+        couponCode:
+          type: string
+          description: Generated coupon/discount code
+          example: 'JOY-8PBFA801B2FH'
+        programTitle:
+          type: string
+          description: Program title
+          example: 'Points for discounts'
+        shopifyCustomerId:
+          type: integer
+          description: Shopify customer ID
+          example: 7603687882987
+        programDescription:
+          type: string
+          description: Program description
+          example: '1 x 1% discount'
+        orderReqAmount:
+          type: string
+          description: Minimum order amount required
+          example: '$1'
+        expiredAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Reward expiration date
+          example: null
+        discountStatus:
+          type: string
+          enum: [active, used, expired]
+          description: Current discount status
+          example: 'active'
+        program:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              description: Program ID
+              example: 'akwQ96WZJMIqrG26PNlC'
+            title:
+              type: string
+              description: Program title
+              example: 'Points for discounts'
+        createdAt:
+          type: string
+          format: date-time
+          description: Reward creation timestamp
+          example: '2025-06-12T10:31:25.781Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: '2025-06-12T10:31:25.781Z'
+
+    Tier:
+      type: object
+      description: "Customer tier with all fields that may be returned by the API. Note: Actual responses may only include non-null fields due to automatic filtering."
+      properties:
+        id:
+          type: string
+          description: Tier ID
+          example: '0cd20cc6-1cac-40fe-b350-49deca03470d'
+        name:
+          type: string
+          description: Tier name
+          example: 'VIP - PRO'
+        icon:
+          type: string
+          description: Default icon URL
+          example: 'https://cdnapps.avada.io/joy/vip-tiers/icons/bronze.png'
+        iconCustom:
+          type: string
+          description: Custom icon URL
+          example: ''
+        targetPoint:
+          type: integer
+          description: Points required to reach this tier
+          example: 5000
+        targetPointUpdate:
+          type: integer
+          description: Updated points required
+          example: 5000
+        members:
+          type: integer
+          description: Number of customers in this tier
+          example: 42
+        placedOrderReward:
+          type: boolean
+          description: Whether tier has place order rewards
+          example: false
+        rateMoney:
+          type: number
+          description: Money rate for earning points
+          example: 1.0
+        earnPoint:
+          type: integer
+          description: Points earning configuration
+          example: 1
+        shopId:
+          type: string
+          description: Shop ID
+          example: 'umN0f3GKyQC3XS1AwVWg'
+        imageBlock:
+          type: string
+          description: Image block URL
+          example: 'https://cdnapps.avada.io/joy/vip-tiers/icons/bronze.png'
+        tierRewards:
+          type: array
+          description: Tier-specific rewards/benefits
+          items:
+            $ref: '#/components/schemas/TierReward'
+          example: []
+        inactive:
+          type: boolean
+          description: Whether tier is inactive
+          example: false
+        isExclusiveTier:
+          type: boolean
+          description: Whether tier is exclusive
+          example: false
+        prevNames:
+          type: array
+          description: Previous names of this tier
+          items:
+            type: string
+          example: []
+        createdAt:
+          type: string
+          format: date-time
+          description: Tier creation timestamp
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: '2024-01-20T14:45:30.000Z'
+
+    TierReward:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Reward ID
+          example: 'FNSGeIIRYIagQR9ysmD3'
+        status:
+          type: boolean
+          description: Whether reward is active
+          example: true
+        title:
+          type: string
+          description: Reward title
+          example: 'Points for discounts'
+        redeemType:
+          type: string
+          enum: [fixed, dynamic]
+          description: Type of redemption
+          example: 'fixed'
+        spendPoint:
+          type: integer
+          description: Points required to redeem
+          example: 100
+        minSpendPoint:
+          type: string
+          description: Minimum points to spend
+          example: ''
+        maxSpendPoint:
+          type: string
+          description: Maximum points to spend
+          example: ''
+        appliedTo:
+          type: string
+          enum: [all, specific, sf_product]
+          description: Where reward applies
+          example: 'all'
+        orderReq:
+          type: string
+          enum: [none, min_amount]
+          description: Order requirements
+          example: 'none'
+        orderReqAmount:
+          type: number
+          description: Minimum order amount required
+          example: 0
+        expiredAfter:
+          type: string
+          description: When reward expires
+          example: 'permanent'
+        expiredTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: Specific expiration time
+          example: '2025-06-02T07:35:16.908Z'
+        type:
+          type: string
+          description: Reward type
+          example: 'tier_privileges'
+        codeName:
+          type: string
+          description: Code name for reward
+          example: 'Discount'
+        earnAmount:
+          type: string
+          description: Amount earned
+          example: '1'
+        event:
+          type: string
+          description: Event type for reward
+          example: 'bonus_point'
+        bonusPoints:
+          type: string
+          description: Bonus points awarded
+          example: '1'
+        priority:
+          type: integer
+          description: Reward priority
+          example: 0
+        showLoyaltyPage:
+          type: boolean
+          description: Whether to show on loyalty page
+          example: true
+        translateTitle:
+          type: object
+          description: Translated titles for different languages
+          example:
+            vi: 'Points for discounts (Vietnamese)'
+            ar: 'Points for discounts (Arabic)'
+        expired:
+          type: boolean
+          description: Whether reward has expired
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          description: Reward creation timestamp
+          example: '2025-06-02T07:47:49.623Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: '2025-06-18T08:13:55.794Z'
+
+    Shop:
+      type: object
+      description: "Shop information with safe fields returned by the whoami endpoint"
+      properties:
+        id:
+          type: string
+          description: Shop ID
+          example: 'shop_abc123'
+        name:
+          type: string
+          description: Shop name
+          example: 'My Awesome Store'
+        domain:
+          type: string
+          description: Shop domain
+          example: 'my-store.myshopify.com'
+        email:
+          type: string
+          format: email
+          description: Shop owner email
+          example: 'owner@mystore.com'
+        plan:
+          type: string
+          description: Current subscription plan
+          example: 'professional'
+        currency:
+          type: string
+          description: Shop currency code
+          example: 'USD'
+        timezone:
+          type: string
+          description: Shop timezone
+          example: 'America/New_York'
+        countryCode:
+          type: string
+          description: Shop country code
+          example: 'US'
+        isInstalled:
+          type: boolean
+          description: Whether the Joy app is installed
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Shop creation timestamp
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: '2024-01-20T14:45:30.000Z'
+
+paths:
+  # =============== LOYALTY PROGRAMS ===============
+  /rest_api/v2/programs/earning:
+    get:
+      tags:
+        - Programs
+      summary: Get earning programs
+      description: Retrieve all earning programs for the authenticated shop
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+      responses:
+        '200':
+          description: List of earning programs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Program'
+              example:
+                success: true
+                data:
+                  - id: 'prog_earning_001'
+                    title: 'Sign Up Bonus'
+                    description: 'Get points for creating an account'
+                    type: 'earning'
+                    event: 'sign_up'
+                    status: true
+                    earnPoint: 100
+                    rateMoney: 1.0
+                    priority: 1
+                    createdAt: '2024-01-15T10:30:00.000Z'
+                    updatedAt: '2024-01-20T14:45:30.000Z'
+                  - id: 'prog_earning_002'
+                    title: 'Place Order Reward'
+                    description: 'Earn points for every purchase'
+                    type: 'earning'
+                    event: 'place_order'
+                    status: true
+                    earnBy: 'price'
+                    earnPoint: 1
+                    rateMoney: 1.0
+                    appliedPlaceOrderTo: 'all'
+                    appliedSource: ['web', 'pos']
+                    autoRemovePoints: false
+                    skipEarnPointGuest: false
+                    roundingMethod: 'round'
+                    createdAt: '2024-01-10T08:15:00.000Z'
+                    updatedAt: '2024-01-25T16:20:45.000Z'
+        '403':
+          description: Plan upgrade required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/programs/earning/eligibility:
+    get:
+      tags:
+        - Programs
+      summary: Get programs by customer eligibility
+      description: |
+        Retrieve earning programs for a specific customer. Single earn event programs 
+        (like social media follows, sign up, birthday) will include an `isEarned` field 
+        indicating whether the customer has already earned points from that program.
+        
+        **Customer Identifier Required**: Must provide either `customerId` or `shopifyCustomerId` parameter.
+      parameters:
+        - name: shopifyCustomerId
+          in: query
+          schema:
+            type: string
+          description: Shopify customer ID
+        - name: customerId
+          in: query
+          schema:
+            type: string
+          description: Internal customer ID
+      responses:
+        '200':
+          description: Programs for customer with earned status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: '#/components/schemas/Program'
+                            - type: object
+                              properties:
+                                isEarned:
+                                  type: boolean
+                                  description: |
+                                    Only present for single earn event programs (social media follows, 
+                                    sign up, birthday, etc.). Indicates if customer has earned from this program.
+              example:
+                success: true
+                data:
+                  - id: 'prog_earning_001'
+                    title: 'Sign Up Bonus'
+                    type: 'earning'
+                    event: 'sign_up'
+                    earnPoint: 100
+                    isEarned: true
+                    createdAt: '2024-01-15T10:30:00.000Z'
+                    updatedAt: '2024-01-20T14:45:30.000Z'
+                  - id: 'prog_earning_002'
+                    title: 'Place Order'
+                    type: 'earning'
+                    event: 'place_order'
+                    earnPoint: 10
+                    createdAt: '2024-01-16T08:00:00.000Z'
+                    updatedAt: '2024-01-21T10:15:00.000Z'
+                  - id: 'prog_earning_003'
+                    title: 'Follow Instagram'
+                    type: 'earning'
+                    event: 'follow_instagram'
+                    earnPoint: 50
+                    isEarned: false
+                    createdAt: '2024-01-16T12:00:00.000Z'
+                    updatedAt: '2024-01-21T16:30:00.000Z'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/programs/earning/points/calculate:
+    post:
+      tags:
+        - Programs
+      summary: Calculate earning points
+      description: Calculate points that would be earned for given products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                products:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      quantity:
+                        type: integer
+                      price:
+                        type: number
+                shopifyCustomerId:
+                  type: string
+                sourceName:
+                  type: string
+                  default: 'web'
+              required:
+                - products
+      responses:
+        '200':
+          description: Calculated points
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          pointsEarn:
+                            type: integer
+                          products:
+                            type: array
+                            items:
+                              type: object
+
+  /rest_api/v2/programs/earning/social/interactions:
+    post:
+      tags:
+        - Programs
+      summary: Handle social earning interactions
+      description: Process social media interactions for earning points
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shopifyCustomerId:
+                  type: string
+                event:
+                  type: string
+                earningId:
+                  type: string
+              required:
+                - shopifyCustomerId
+      responses:
+        '200':
+          description: Social earning processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /rest_api/v2/programs/redemption:
+    get:
+      tags:
+        - Programs
+      summary: Get redemption programs
+      description: Retrieve all point spending/redemption programs
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+        - name: shopifyCustomerId
+          in: query
+          schema:
+            type: string
+          description: Shopify customer ID for program limitations
+        - name: event
+          in: query
+          schema:
+            type: string
+            enum: [amount_discount, percentage_discount, free_shipping, free_gift]
+          description: Filter by program event type
+      responses:
+        '200':
+          description: List of spending programs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Program'
+              example:
+                success: true
+                data:
+                  - id: 'aYorhxYUTkUKIDZgL1R5'
+                    title: 'Free Product Test'
+                    type: 'spending'
+                    event: 'free_gift'
+                    status: true
+                    spendPoint: 200
+                    earnAmount: 700
+                    priority: 0
+                    redeemType: 'fixed'
+                    appliedTo: 'sf_product'
+                    redeemIn: 'available_in_online_store'
+                    expiredTime: ''
+                    userAvailability: 'userRedeemed'
+                    showLoyaltyPage: true
+                    limitRedeem: 'redeemWithoutLimit'
+                    totalLimitationRedeem: 0
+                    combinedWith: ['orderDiscounts', 'productDiscounts', 'shippingDiscounts']
+                    specificProductIds: [44438017147115, 44438017114347]
+                    variantIds: [44438017147115, 44438017179883, 44438017245419, 44438017114347]
+                    specificProducts:
+                      [
+                        {
+                          id: 8209413669099,
+                          title: 'The Complete Snowboard',
+                          handle: 'the-complete-snowboard',
+                          image:
+                            {
+                              src: 'https://cdn.shopify.com/s/files/1/0680/3950/8203/products/Main_589fc064-24a2-4236-9eaf-13b2bd35d21d.jpg?v=1703045153',
+                            },
+                        },
+                      ]
+                    giftStatus: 'none'
+                    expired: false
+                    isDraft: false
+                    createdAt: '2024-08-27T08:09:46.757Z'
+                    updatedAt: '2025-06-18T08:13:55.797Z'
+                  - id: 'vIswMZYogmKyw94GzEvn'
+                    title: 'Points for discounts'
+                    type: 'spending'
+                    event: 'amount_discount'
+                    status: true
+                    spendPoint: 100
+                    earnAmount: '5'
+                    priority: 3
+                    redeemType: 'fixed'
+                    appliedTo: 'sf_product'
+                    orderReq: 'none'
+                    orderReqAmount: 0
+                    expiredTime: ''
+                    userAvailability: 'userRedeemed'
+                    showLoyaltyPage: true
+                    limitRedeem: 'redeemWithoutLimit'
+                    combinedWith: []
+                    specificProductIds: [44438017114347]
+                    conditions:
+                      [
+                        {
+                          type: 'criteria_customer',
+                          field: 'customer_country_code',
+                          typeMatch: 'equal',
+                        },
+                      ]
+                    giftStatus: 'none'
+                    expired: false
+                    isDraft: false
+                    createdAt: '2024-10-14T04:36:02.987Z'
+                    updatedAt: '2025-06-18T08:13:55.283Z'
+
+  /rest_api/v2/programs/{programId}:
+    get:
+      tags:
+        - Programs
+      summary: Get program by ID
+      description: Retrieve a specific program by its ID
+      parameters:
+        - name: programId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Program ID
+        - name: shopifyCustomerId
+          in: query
+          schema:
+            type: string
+          description: Shopify customer ID for program limitations
+      responses:
+        '200':
+          description: Program details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Program'
+              example:
+                success: true
+                data:
+                  id: 'aYorhxYUTkUKIDZgL1R5'
+                  title: 'Free Product Test'
+                  type: 'spending'
+                  event: 'free_gift'
+                  status: true
+                  spendPoint: 200
+                  earnAmount: 700
+                  priority: 0
+                  redeemType: 'fixed'
+                  appliedTo: 'sf_product'
+                  redeemIn: 'available_in_online_store'
+                  expiredTime: ''
+                  userAvailability: 'userRedeemed'
+                  showLoyaltyPage: true
+                  limitRedeem: 'redeemWithoutLimit'
+                  totalLimitationRedeem: 0
+                  combinedWith: ['orderDiscounts', 'productDiscounts', 'shippingDiscounts']
+                  specificProductIds: [44438017147115, 44438017114347]
+                  variantIds: [44438017147115, 44438017179883, 44438017245419, 44438017114347]
+                  specificProducts:
+                    [
+                      {
+                        id: 8209413669099,
+                        title: 'The Complete Snowboard',
+                        handle: 'the-complete-snowboard',
+                        image:
+                          {
+                            src: 'https://cdn.shopify.com/s/files/1/0680/3950/8203/products/Main_589fc064-24a2-4236-9eaf-13b2bd35d21d.jpg?v=1703045153',
+                          },
+                        variants:
+                          [
+                            {
+                              id: 44438017147115,
+                              price: '700',
+                              title: 'Ice',
+                              inventory_quantity: 10,
+                            },
+                          ],
+                      },
+                    ]
+                  giftStatus: 'none'
+                  expired: false
+                  isDraft: false
+                  createdAt: '2024-08-27T08:09:46.757Z'
+                  updatedAt: '2025-06-18T08:13:55.797Z'
+        '404':
+          description: Program not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/programs/redemption/redeem:
+    post:
+      tags:
+        - Programs
+      summary: Redeem points for rewards
+      description: Redeem customer points for rewards through a redemption program
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                programId:
+                  type: string
+                shopifyCustomerId:
+                  type: string
+                quantity:
+                  type: integer
+                  default: 1
+              required:
+                - programId
+                - shopifyCustomerId
+      responses:
+        '200':
+          description: Redemption successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # =============== CUSTOMER MANAGEMENT ===============
+  /rest_api/v2/customers:
+    get:
+      tags:
+        - Customers
+      summary: Get customers with pagination
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+        - name: before
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (before) - Firestore document ID of customer to paginate before
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (after) - Firestore document ID of customer to paginate after
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 1000
+          description: Number of customers per page
+        - name: email
+          in: query
+          schema:
+            type: string
+          description: Search by customer email address
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [member, guest, left]
+          description: Filter by customer type
+        - name: tierId
+          in: query
+          schema:
+            type: string
+          description: Filter by customer tier ID
+        - name: updated_at_min
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter customers updated after this date
+        - name: updated_at_max
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter customers updated before this date
+        - name: created_at_max
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter customers created before this date
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum:
+              [createdAt_desc, createdAt_asc, updatedAt_desc, updatedAt_asc, point_desc, point_asc]
+            default: createdAt_desc
+          description: Sort order for results
+        - name: hasCount
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include total count in response (may increase response time)
+      responses:
+        '200':
+          description: Paginated list of customers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Customer'
+              example:
+                success: true
+                data:
+                  - id: 'b1wvKrxdDZ11U8tUlyyx'
+                    shopifyCustomerId: 7801029525739
+                    email: 'customer@example.com'
+                    name: 'John Doe'
+                    firstName: 'John'
+                    lastName: 'Doe'
+                    type: 'member'
+                    point: 100
+                    tierPoint: 100
+                    totalEarnedPoints: 100
+                    hasPoint: true
+                    hasJoinedProgram: true
+                    state: 'enabled'
+                    acceptsMarketing: false
+                    tierId: '1Fe1kqHZbE7Alx1GmFEC'
+                    tierName: 'Bronze'
+                    pointsRemain: 4900
+                    isCustomerB2B: false
+                    earnSignUp: true
+                    referralCode: '2kxRoqlDQMp'
+                    hasTier: true
+                    totalSpentCurrencyCode: 'VND'
+                    createdAt: '2025-04-29T10:23:05.991Z'
+                    updatedAt: '2025-06-16T10:20:58.663Z'
+                meta:
+                  pagination:
+                    hasNext: true
+                    hasPre: false
+                    total: 1250
+                    totalPage: 63
+                timestamp: '2025-06-16T10:20:58.663Z'
+
+  /rest_api/v2/customers/{customerId}:
+    get:
+      tags:
+        - Customers
+      summary: Get customer by ID
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Internal customer ID
+      responses:
+        '200':
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Customer'
+              example:
+                success: true
+                data:
+                  id: 'cust_abc123'
+                  shopifyCustomerId: 7891234567890
+                  email: 'customer@example.com'
+                  firstName: 'John'
+                  lastName: 'Doe'
+                  point: 150
+                  pointsRemain: 350
+                  tierId: 'tier_gold_123'
+                  tierName: 'Gold'
+                  createdAt: '2023-07-15T10:30:00.000Z'
+                  updatedAt: '2023-07-28T07:27:54.123Z'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - Customers
+      summary: Update customer data
+      description: Update customer information (supports birthday fields)
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Internal customer ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dateOfBirth:
+                  type: string
+                  format: date
+                  description: Date of birth in ISO 8601 format (YYYY-MM-DD)
+                birthday:
+                  type: string
+                  description: Birthday in MM/DD format
+              example:
+                dateOfBirth: '1990-05-15'
+      responses:
+        '200':
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          shopifyCustomerId:
+                            type: string
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/customers/{customerId}/points/earned:
+    get:
+      tags:
+        - Customers
+      summary: Get customer earned points
+      description: Retrieve total points earned by a customer across all programs
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Customer ID (can be internal ID or Shopify customer ID)
+      responses:
+        '200':
+          description: Customer earned points summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalEarnedPoints:
+                            type: integer
+
+  /rest_api/v2/customers/external/{shopifyCustomerId}:
+    get:
+      tags:
+        - Customers
+      summary: Get customer by Shopify ID
+      description: Retrieve customer information using Shopify customer ID
+      parameters:
+        - name: shopifyCustomerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Shopify customer ID
+      responses:
+        '200':
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Customer'
+              example:
+                success: true
+                data:
+                  id: 'cust_abc123'
+                  shopifyCustomerId: '7891234567890'
+                  email: 'customer@example.com'
+                  firstName: 'John'
+                  lastName: 'Doe'
+                  point: 150
+                  totalEarnedPoints: 300
+                  hasPoint: true
+                  hasJoinedProgram: true
+                  state: 'enabled'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: 'Customer not found'
+                data: null
+    put:
+      tags:
+        - Customers
+      summary: Update customer data by Shopify ID
+      description: Update customer information using Shopify customer ID
+      parameters:
+        - name: shopifyCustomerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Shopify customer ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dateOfBirth:
+                  type: string
+                  format: date
+                  description: Date of birth in ISO 8601 format (YYYY-MM-DD)
+                birthday:
+                  type: string
+                  description: Birthday in MM/DD format
+              example:
+                dateOfBirth: '1990-05-15'
+      responses:
+        '200':
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          shopifyCustomerId:
+                            type: string
+
+  /rest_api/v2/customers/{customerId}/tier:
+    put:
+      tags:
+        - Customers
+      summary: Update customer VIP tier
+      description: Update customer's VIP tier with comprehensive tier processing
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Internal customer ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tierId:
+                  type: string
+                  description: Target tier ID
+                isInitTier:
+                  type: boolean
+                  default: false
+                  description: Whether this is an initial tier assignment
+                triggerReward:
+                  type: boolean
+                  default: true
+                  description: Whether to trigger tier rewards
+                adminNote:
+                  type: string
+                  description: Admin note for the tier change activity
+              required:
+                - tierId
+              example:
+                tierId: 'tier_gold_123'
+                isInitTier: false
+                triggerReward: true
+                adminNote: 'Tier upgraded via REST API'
+      responses:
+        '200':
+          description: Customer tier updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          shopifyCustomerId:
+                            type: string
+                          tierId:
+                            type: string
+                          tierName:
+                            type: string
+                          tierPoint:
+                            type: integer
+                          tierUpdatedAt:
+                            type: string
+                            format: date-time
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer or tier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/customers/external/{shopifyCustomerId}/tier:
+    put:
+      tags:
+        - Customers
+      summary: Update customer VIP tier by Shopify ID
+      description: Update customer's VIP tier using Shopify customer ID
+      parameters:
+        - name: shopifyCustomerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Shopify customer ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tierId:
+                  type: string
+                  description: Target tier ID
+                isInitTier:
+                  type: boolean
+                  default: false
+                  description: Whether this is an initial tier assignment
+                triggerReward:
+                  type: boolean
+                  default: true
+                  description: Whether to trigger tier rewards
+                adminNote:
+                  type: string
+                  description: Admin note for the tier change activity
+              required:
+                - tierId
+              example:
+                tierId: 'tier_gold_123'
+                triggerReward: true
+      responses:
+        '200':
+          description: Customer tier updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          shopifyCustomerId:
+                            type: string
+                          tierId:
+                            type: string
+                          tierName:
+                            type: string
+                          tierPoint:
+                            type: integer
+                          tierUpdatedAt:
+                            type: string
+                            format: date-time
+
+  # =============== POINT TRANSACTIONS ===============
+  /rest_api/v2/transactions:
+    get:
+      tags:
+        - Activities
+      summary: Get point transactions with pagination
+      description: Retrieve paginated list of point transactions/activities
+      parameters:
+        - name: shopifyCustomerId
+          in: query
+          schema:
+            type: string
+          description: >
+            Filter by Shopify customer ID.
+            
+            **Note:** At least one of `shopifyCustomerId` or `customerId` is required.
+        - name: customerId
+          in: query
+          schema:
+            type: string
+          description: >
+            Filter by internal customer ID.
+            
+            **Note:** At least one of `shopifyCustomerId` or `customerId` is required.
+        - name: before
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (before) - Firestore document ID of activity to paginate before
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (after) - Firestore document ID of activity to paginate after
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 1000
+          description: Number of transactions per page
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [earn_point, redeem_point, adjust_point]
+          description: Filter by activity type
+        - name: event
+          in: query
+          schema:
+            type: string
+          description: Filter by specific event
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [admin, user, rest_api, webhook]
+          description: Filter by activity source
+        - name: created_at_min
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter activities created after this date
+        - name: created_at_max
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter activities created before this date
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [createdAt_desc, createdAt_asc]
+            default: createdAt_desc
+          description: Sort order for results
+        - name: hasCount
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include total count in response (may increase response time)
+      responses:
+        '200':
+          description: Paginated list of transactions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Activity'
+              example:
+                success: true
+                data:
+                  - id: 'activity_123'
+                    customerId: 'cust_abc'
+                    shopifyCustomerId: '7891234567890'
+                    type: 'earn_point'
+                    event: 'sign_up'
+                    oldPoint: 0
+                    newPoint: 100
+                    earnPoint: 100
+                    source: 'rest_api'
+                    createdAt: '2025-08-12T08:30:00.000Z'
+                  - id: 'activity_124'
+                    customerId: 'cust_abc'
+                    shopifyCustomerId: '7891234567890'
+                    type: 'redeem_point'
+                    event: 'amount_discount'
+                    oldPoint: 100
+                    newPoint: 50
+                    spendPoint: 50
+                    source: 'user'
+                    createdAt: '2025-08-12T07:15:00.000Z'
+                meta:
+                  pagination:
+                    hasNext: true
+                    hasPre: false
+                    total: 45
+                    totalPage: 3
+                timestamp: '2025-08-12T08:30:00.000Z'
+
+  /rest_api/v2/transactions/{transactionId}:
+    get:
+      tags:
+        - Activities
+      summary: Get transaction by ID
+      description: Retrieve details of a specific point transaction
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Transaction ID
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Activity'
+
+  /rest_api/v2/transactions/points/award:
+    post:
+      tags:
+        - Activities
+      summary: Award points to customer
+      description: Add points to a customer's account
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shopifyCustomerId:
+                  type: string
+                  description: Shopify customer ID
+                  example: '8720295559390'
+                point:
+                  type: integer
+                  description: Points to award
+                  example: 100
+                adminNote:
+                  type: string
+                  description: Internal note for admin reference
+                  example: 'Bonus points for customer loyalty'
+                userNote:
+                  type: string
+                  description: Note visible to customer
+                  example: 'Loyalty bonus - thank you for being a valued customer!'
+                reason:
+                  type: string
+                  description: Reason for awarding points
+                  example: 'manual_adjustment'
+              required:
+                - shopifyCustomerId
+                - point
+      responses:
+        '200':
+          description: Points awarded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /rest_api/v2/transactions/points/deduct:
+    post:
+      tags:
+        - Activities
+      summary: Deduct points from customer
+      description: Remove points from a customer's account
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shopifyCustomerId:
+                  type: string
+                  description: Shopify customer ID
+                  example: '8720295559390'
+                point:
+                  type: integer
+                  description: Points to deduct
+                  example: 50
+                adminNote:
+                  type: string
+                  description: Internal note for admin reference
+                  example: 'Points deduction for policy violation'
+                userNote:
+                  type: string
+                  description: Note visible to customer
+                  example: 'Points adjusted due to return policy'
+                reason:
+                  type: string
+                  description: Reason for deducting points
+                  example: 'policy_adjustment'
+              required:
+                - shopifyCustomerId
+                - point
+      responses:
+        '200':
+          description: Points deducted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /rest_api/v2/transactions/points/adjust:
+    post:
+      tags:
+        - Activities
+      summary: Adjust customer points
+      description: Adjust customer points (positive or negative adjustment)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shopifyCustomerId:
+                  type: string
+                  description: Shopify customer ID
+                  example: '8720295559390'
+                point:
+                  type: integer
+                  description: Points adjustment (positive or negative)
+                  example: -25
+                adminNote:
+                  type: string
+                  description: Internal note for admin reference
+                  example: 'Correcting points balance discrepancy'
+                userNote:
+                  type: string
+                  description: Note visible to customer
+                  example: 'Points balance correction'
+                reason:
+                  type: string
+                  description: Reason for adjusting points
+                  example: 'balance_correction'
+              required:
+                - shopifyCustomerId
+                - point
+      responses:
+        '200':
+          description: Points adjusted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /rest_api/v2/transactions/points/reset:
+    post:
+      tags:
+        - Activities
+      summary: Reset customer points
+      description: Set customer points to a specific value
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shopifyCustomerId:
+                  type: string
+                  description: Shopify customer ID
+                  example: '8720295559390'
+                point:
+                  type: integer
+                  description: New points balance to set
+                  example: 0
+                adminNote:
+                  type: string
+                  description: Internal note for admin reference
+                  example: 'Resetting points balance for new program'
+                userNote:
+                  type: string
+                  description: Note visible to customer
+                  example: 'Points reset for new loyalty program launch'
+                reason:
+                  type: string
+                  description: Reason for resetting points
+                  example: 'program_migration'
+              required:
+                - shopifyCustomerId
+                - point
+      responses:
+        '200':
+          description: Points reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # =============== REWARDS & BENEFITS ===============
+  /rest_api/v2/rewards:
+    get:
+      tags:
+        - Rewards
+      summary: Get customer rewards
+      description: |
+        Retrieve customer rewards with optional filtering and pagination.
+        
+        **Customer Identifier Required**: Must provide either `customerId` or `shopifyCustomerId` parameter.
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+        - name: customerId
+          in: query
+          schema:
+            type: string
+          description: Joy internal customer ID
+          example: 'XLacU68YKR5tC3moGqUP'
+        - name: shopifyCustomerId
+          in: query
+          schema:
+            type: string
+          description: Shopify customer ID
+          example: '8720295559390'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, used, expired]
+          description: Filter by reward status
+        - name: typeReward
+          in: query
+          schema:
+            type: string
+          description: Filter by reward type
+        - name: before
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (before) - Firestore document ID of reward to paginate before
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (after) - Firestore document ID of reward to paginate after
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 1000
+          description: Number of rewards per page
+        - name: created_at_min
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter rewards created after this date
+        - name: created_at_max
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter rewards created before this date
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [createdAt_desc, createdAt_asc, updatedAt_desc, updatedAt_asc]
+            default: createdAt_desc
+          description: Sort order for results
+        - name: hasCount
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include total count in response (may increase response time)
+      responses:
+        '200':
+          description: List of customer rewards
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Reward'
+              example:
+                success: true
+                data:
+                  - id: 'OPfV7dXaPn1Ejbm9piPs'
+                    customerId: 'o9AQeUCXYDjbeFm7vAKy'
+                    email: 'anhth@avadagroup.com'
+                    couponCode: 'JOY-8PBFA801B2FH'
+                    programTitle: 'Points for discounts'
+                    shopifyCustomerId: 7603687882987
+                    programDescription: '1 x 1% discount'
+                    orderReqAmount: '$1'
+                    expiredAt: null
+                    discountStatus: 'active'
+                    program:
+                      id: 'akwQ96WZJMIqrG26PNlC'
+                      title: 'Points for discounts'
+                    createdAt: '2025-06-12T10:31:25.781Z'
+                    updatedAt: '2025-06-12T10:31:25.781Z'
+                meta:
+                  pagination:
+                    hasNext: false
+                    hasPre: false
+                    total: 1
+                    totalPage: 1
+                timestamp: '2025-06-12T10:31:25.781Z'
+        '404':
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/rewards/{rewardId}:
+    get:
+      tags:
+        - Rewards
+      summary: Get reward by ID
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+        - name: rewardId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Reward ID
+          example: 'OPfV7dXaPn1Ejbm9piPs'
+      responses:
+        '200':
+          description: Reward details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Reward'
+
+  /rest_api/v2/rewards/coupons/refund:
+    post:
+      tags:
+        - Rewards
+      summary: Refund coupon code
+      description: Process coupon refund and return points to customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                discountCode:
+                  type: string
+                  description: The coupon/discount code to refund
+                  example: 'JOY-8PBFA801B2FH'
+                shopifyCustomerId:
+                  type: string
+                  description: Shopify customer ID who owns the coupon
+                  example: '7603687882987'
+                reason:
+                  type: string
+                  description: Optional reason for the refund
+                  example: 'Customer request'
+              required:
+                - discountCode
+                - shopifyCustomerId
+            example:
+              discountCode: 'JOY-8PBFA801B2FH'
+              shopifyCustomerId: '7603687882987'
+              reason: 'Customer request'
+      responses:
+        '200':
+          description: Coupon refunded successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                            example: true
+                          message:
+                            type: string
+                            example: 'Coupon refunded successfully'
+              example:
+                success: true
+                data:
+                  success: true
+                  message: 'Coupon refunded successfully'
+        '400':
+          description: Invalid request or coupon not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: 'Coupon does not exist or has expired'
+
+  # =============== SIMPLE REDEMPTION ===============
+  /rest_api/v2/redeem:
+    post:
+      tags:
+        - Redemption
+      summary: Redeem loyalty points
+      description: Redeem customer loyalty points for discounts or rewards
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - programId
+              properties:
+                customerId:
+                  type: string
+                  description: Joy internal customer ID
+                  example: 'XLacU68YKR5tC3moGqUP'
+                programId:
+                  type: string
+                  description: ID of the redemption program
+                  example: 'vIswMZYogmKyw94GzEvn'
+                locale:
+                  type: string
+                  description: Language locale
+                  example: 'en'
+                  default: 'en'
+                redeemPoint:
+                  type: integer
+                  description: Points to redeem
+                  example: 100
+                shopifyCustomerId:
+                  type: string
+                  description: Shopify customer ID
+                  example: '8720295559390'
+                source:
+                  type: string
+                  description: Source of the redemption
+                  example: 'rest_api'
+                  default: 'rest_api'
+      responses:
+        '200':
+          description: Points redeemed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                            example: true
+                          message:
+                            type: string
+                            example: 'Points redeemed successfully'
+                          reward:
+                            type: object
+                            description: Created reward/coupon details
+        '400':
+          description: Invalid request or insufficient points
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Customer or program not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # =============== TIER MANAGEMENT ===============
+  /rest_api/v2/tiers:
+    get:
+      tags:
+        - Tiers
+      summary: Get all tiers
+      description: Retrieve all customer tiers for the authenticated shop
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+      responses:
+        '200':
+          description: List of tiers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Tier'
+              example:
+                success: true
+                data:
+                  - id: '0cd20cc6-1cac-40fe-b350-49deca03470d'
+                    name: 'VIP - PRO'
+                    icon: 'https://cdnapps.avada.io/joy/vip-tiers/icons/bronze.png'
+                    targetPoint: 0
+                    members: 0
+                    isSystemTier: false
+                    isExclusiveTier: true
+                    textColor: '#785F4D'
+                    boxBgColor: '#EAD8C0'
+                    tierRewards: []
+                    createdAt: '2024-12-05T07:39:18.085Z'
+                    updatedAt: '2025-06-12T10:29:00.304Z'
+                  - id: '1Fe1kqHZbE7Alx1GmFEC'
+                    name: 'Bronze - 1'
+                    icon: 'https://cdnapps.avada.io/joy/vip-tiers/icons/bronze.png'
+                    targetPoint: 0
+                    members: 0
+                    isSystemTier: true
+                    systemType: 'bronze'
+                    textColor: '#785F4D'
+                    boxBgColor: '#EAD8C0'
+                    tierRewards:
+                      - id: 'FNSGeIIRYIagQR9ysmD3'
+                        status: true
+                        title: 'Points for discounts'
+                        redeemType: 'fixed'
+                        spendPoint: 100
+                        type: 'tier_privileges'
+                        showLoyaltyPage: true
+                        expired: false
+                        createdAt: '2025-06-02T07:47:49.623Z'
+                        updatedAt: '2025-06-18T08:13:55.794Z'
+                    createdAt: '2023-12-20T04:15:11.202Z'
+                    updatedAt: '2025-06-05T08:09:18.273Z'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Plan upgrade required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/tiers/{tierId}:
+    get:
+      tags:
+        - Tiers
+      summary: Get tier by ID
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+        - name: tierId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Tier ID
+      responses:
+        '200':
+          description: Tier details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tier'
+              example:
+                success: true
+                data:
+                  id: '1Fe1kqHZbE7Alx1GmFEC'
+                  name: 'Bronze - 1'
+                  icon: 'https://cdnapps.avada.io/joy/vip-tiers/icons/bronze.png'
+                  iconCustom: ''
+                  targetPoint: 0
+                  targetPointUpdate: 0
+                  members: 0
+                  placedOrderReward: false
+                  rateMoney: ''
+                  earnPoint: ''
+                  isSystemTier: true
+                  hideDefaultTier: false
+                  bgType: 'default'
+                  bgImage: ''
+                  textColor: '#785F4D'
+                  progressBarColor: '#785F4D'
+                  boxBgColor: '#EAD8C0'
+                  boxTextColor: '#785F4D'
+                  bgCardColor: '#EAD8C0'
+                  cardOpacity: 0
+                  iconColor: '#222222'
+                  systemType: 'bronze'
+                  shopId: 'umN0f3GKyQC3XS1AwVWg'
+                  imageBlock: 'https://cdnapps.avada.io/joy/vip-tiers/icons/bronze.png'
+                  tierRewards:
+                    - id: 'FNSGeIIRYIagQR9ysmD3'
+                      status: true
+                      title: 'Points for discounts'
+                      redeemType: 'fixed'
+                      minSpendPoint: ''
+                      maxSpendPoint: ''
+                      spendPoint: 100
+                      appliedTo: 'all'
+                      orderReq: 'none'
+                      orderReqAmount: 0
+                      expiredAfter: 'permanent'
+                      expiredTime: '2025-06-02T07:35:16.908Z'
+                      type: 'tier_privileges'
+                      codeName: 'Discount'
+                      earnAmount: '1'
+                      event: 'bonus_point'
+                      bonusPoints: '1'
+                      priority: 0
+                      showLoyaltyPage: true
+                      translateTitle:
+                        vi: 'Points for discounts (Vietnamese)'
+                        ar: 'Points for discounts (Arabic)'
+                      expired: false
+                      createdAt: '2025-06-02T07:47:49.623Z'
+                      updatedAt: '2025-06-18T08:13:55.794Z'
+                  inactive: false
+                  isExclusiveTier: false
+                  prevNames: ['Bronze', 'Bronze 1', 'Bronze 12', 'Bronze ']
+                  createdAt: '2023-12-20T04:15:11.202Z'
+                  updatedAt: '2025-06-05T08:09:18.273Z'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Plan upgrade required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Tier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rest_api/v2/tiers/benefits/{benefitType}:
+    get:
+      tags:
+        - Tiers
+      summary: Get tier benefits by type
+      description: Retrieve tier benefits filtered by benefit type
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+        - name: benefitType
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Type of benefit to retrieve
+      responses:
+        '200':
+          description: List of tier benefits
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Program'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Plan upgrade required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # =============== REFERRAL PROGRAM ===============
+  /rest_api/v2/referrals/invitations:
+    post:
+      tags:
+        - Referrals
+      summary: Generate referral invitation
+      description: Create a new referral invitation link for a customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required:
+                - email
+      responses:
+        '200':
+          description: Invitation generated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          inviteLink:
+                            type: string
+                          referralCode:
+                            type: string
+
+  /rest_api/v2/referrals/customers/{customerId}/referrers:
+    get:
+      tags:
+        - Referrals
+      summary: Get customer referrers
+      description: Retrieve list of customers who referred this customer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Customer ID
+      responses:
+        '200':
+          description: List of referrers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+
+  /rest_api/v2/referrals/customers/{customerId}/summary:
+    get:
+      tags:
+        - Referrals
+      summary: Get customer referral summary
+      description: Retrieve comprehensive referral statistics for a customer
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Customer ID
+      responses:
+        '200':
+          description: Referral summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalRedeemCoupon:
+                            type: integer
+                          totalPointEarnRefer:
+                            type: integer
+
+  /rest_api/v2/referrals/analytics:
+    get:
+      tags:
+        - Referrals
+      summary: Get referral analytics
+      description: Retrieve referral program analytics and performance metrics
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Referral analytics data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          countCouponCodeUsage:
+                            type: integer
+
+  # =============== SHOP INFORMATION ===============
+  /rest_api/v2/whoami:
+    get:
+      tags:
+        - Shop
+      summary: Get shop information
+      description: Retrieve safe shop information for the authenticated shop
+      parameters:
+        - $ref: '#/components/parameters/AppKeyHeader'
+        - $ref: '#/components/parameters/SecretKeyHeader'
+      responses:
+        '200':
+          description: Shop information
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          name:
+                            type: string
+                          domain:
+                            type: string
+                          email:
+                            type: string
+                          plan:
+                            type: string
+                          currency:
+                            type: string
+                          timezone:
+                            type: string
+                          countryCode:
+                            type: string
+                          isInstalled:
+                            type: boolean
+                          createdAt:
+                            type: string
+                            format: date-time
+                          updatedAt:
+                            type: string
+                            format: date-time

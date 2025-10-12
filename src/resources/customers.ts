@@ -38,8 +38,11 @@ export class Customers {
     return this.client.put(`/rest_api/v2/customers/${customerId}`, data);
   }
 
+  /**
+   * @deprecated Use getByShopifyId() instead. This method will be removed in a future version.
+   */
   async getByExternalId(externalId: string): Promise<SuccessResponse<Customer>> {
-    return this.client.get(`/rest_api/v2/customers/external/${externalId}`);
+    return this.getByShopifyId(externalId);
   }
 
   async getByShopifyId(shopifyCustomerId: string): Promise<SuccessResponse<Customer>> {
