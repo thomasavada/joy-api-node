@@ -14,7 +14,7 @@ export class JoyApiClient {
     this.maxRetries = options.maxRetries || 3;
 
     this.axios = axios.create({
-      baseURL: options.baseUrl || 'https://api.joy.so',
+      baseURL: options.baseUrl || 'https://dev-api.joy.so',
       timeout: options.timeout || 30000,
       headers: {
         'Content-Type': 'application/json',

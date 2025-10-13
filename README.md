@@ -16,7 +16,7 @@ import JoyApi from 'joy-api-node';
 const joy = new JoyApi({
   appKey: 'your-app-key',
   secretKey: 'your-secret-key',
-  baseUrl: 'https://api.joy.so', // optional, defaults to production
+  baseUrl: 'https://dev-api.joy.so', // optional, defaults to production
   timeout: 30000, // optional, request timeout in ms
   maxRetries: 3 // optional, number of retries for failed requests
 });

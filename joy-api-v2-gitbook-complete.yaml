@@ -26,7 +26,7 @@ info:
     **Query Parameters**: Most list endpoints support filtering by date ranges (`created_at_min`, `created_at_max`, `updated_at_min`, `updated_at_max`), sorting (`order` parameter), and entity-specific filters.
 servers:
   - url: https://dev-api.joy.so
-  - url: https://api.joy.so
+  - url: https://dev-api.joy.so
 tags:
   - name: Programs
     description: Earning and spending programs management
