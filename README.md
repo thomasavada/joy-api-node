@@ -262,7 +262,7 @@ const processProgram = (program: Program) => {
 
 ## API Documentation
 
-For detailed API documentation, please refer to the [Joy Loyalty Program API Documentation](https://docs.joy.so).
+For detailed API documentation, please refer to the [Joy Loyalty Program API Documentation](https://devdocs.joy.so/joy-rest-api-v2/rest-api-v2).
 
 ## License
 
@@ -272,9 +272,10 @@ MIT
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Repository
+## Links
 
-[https://github.com/thomasavada/joy-api-node](https://github.com/thomasavada/joy-api-node)
+- **GitHub Repository**: [https://github.com/thomasavada/joy-api-node](https://github.com/thomasavada/joy-api-node)
+- **npm Package**: [https://www.npmjs.com/package/joy-api-node](https://www.npmjs.com/package/joy-api-node)
 
 ## Support
 
