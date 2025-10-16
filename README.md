@@ -272,6 +272,10 @@ MIT
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Repository
+
+[https://github.com/thomasavada/joy-api-node](https://github.com/thomasavada/joy-api-node)
+
 ## Support
 
-For issues and questions, please open an issue on GitHub.
+For issues and questions, please [open an issue on GitHub](https://github.com/thomasavada/joy-api-node/issues).

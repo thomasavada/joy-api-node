@@ -55,12 +55,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/joy-api-node.git"
+    "url": "https://github.com/thomasavada/joy-api-node.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/joy-api-node/issues"
+    "url": "https://github.com/thomasavada/joy-api-node/issues"
   },
-  "homepage": "https://github.com/yourusername/joy-api-node#readme",
+  "homepage": "https://github.com/thomasavada/joy-api-node#readme",
   "files": [
     "dist/**/*"
   ],
