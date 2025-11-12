@@ -1,4 +1,5 @@
-export { JoyApi } from './joy-api';
+import { JoyApi } from './joy-api';
+
 export { JoyApiClient } from './client';
 export { JoyApiError } from './errors';
 
@@ -13,5 +14,4 @@ export { Referrals } from './resources/referrals';
 export { ShopResource } from './resources/shop';
 export { Redemption } from './resources/redemption';
 
-import { JoyApi } from './joy-api';
 export default JoyApi;
