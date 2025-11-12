@@ -2,6 +2,7 @@ import { JoyApi } from './joy-api';
 
 export { JoyApiClient } from './client';
 export { JoyApiError } from './errors';
+export { JoyApi };
 
 export * from './types';
 
